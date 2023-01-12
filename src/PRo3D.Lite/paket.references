@@ -13,8 +13,7 @@ Aardvark.SceneGraph
 Aardvark.SceneGraph.IO
 Aardvark.Rendering.Text
 
-Adaptify.Core
-Adaptify.MSBuild
+//Adaptify.MSBuild
 
 FsPickler
 FsPickler.Json
