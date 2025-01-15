@@ -5,6 +5,7 @@ open FSharp.Data.Adaptive
 open Adaptify
 open Aardvark.Base
 open Aardvark.UI
+open Aardvark.UI.Primitives
 open PRo3D
 open PRo3D.Base
 open PRo3D.Core.Surface
@@ -217,6 +218,7 @@ module InitSceneObjectParams =
         trafoChanged         = false
         usePivot             = false
         pivotSize            = Transformations.Initial.initPivotSize 0.4
+        eulerMode            = EulerMode.defaultMode
     }
 
     let initNoffset = {

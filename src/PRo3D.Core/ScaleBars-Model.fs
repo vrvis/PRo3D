@@ -6,6 +6,7 @@ open Adaptify
 open Aardvark.Base
 open Aardvark.Rendering
 open Aardvark.UI
+open Aardvark.UI.Primitives
 open PRo3D
 open PRo3D.Base
 open PRo3D.Core.Surface
@@ -18,9 +19,12 @@ open Aether.Operators
 #nowarn "0686"
 
 type Orientation = 
-| Horizontal = 0 
-| Vertical   = 1 
-| Sky        = 2
+| Horizontal_cam    = 0 // right direction of camera view
+| Vertical_cam      = 1 // up direction of camera view
+| Sky_cam           = 2 // camera sky vector
+| Horizontal_planet = 3 // reference systen plane parallel to right camera view
+| Sky_planet        = 4 // up direction of reference system
+
 
 type Pivot = //alignment
 | Left   = 0
@@ -115,7 +119,7 @@ type ScaleBar = {
     view            : CameraView
     transformation  : Transformations
     preTransform    : Trafo3d
-    direction       : V3d
+    //direction       : V3d
 }
 
 [<ModelType>]
@@ -135,9 +139,9 @@ module ScaleBar =
         (view : CameraView) =  
 
         match orientation with
-        | Orientation.Horizontal -> view.Right
-        | Orientation.Vertical   -> view.Up
-        | Orientation.Sky        -> view.Sky
+        | Orientation.Horizontal_cam    -> view.Right
+        | Orientation.Vertical_cam      -> view.Up
+        | Orientation.Sky_cam           -> view.Sky
         |_                       -> view.Right
 
     let current = 0   
@@ -171,6 +175,8 @@ module ScaleBar =
 
             let orientation = orientation |> enum<Orientation>
 
+            //let! direction        = Json.tryRead "direction"
+
             return 
                 {
                     version         = current
@@ -194,7 +200,9 @@ module ScaleBar =
                     view            = view
                     transformation  = transformation
                     preTransform    = preTransform |> Trafo3d.Parse
-                    direction       = getDirectionVec orientation view
+                    //direction       = match direction with
+                    //                    | Some d -> d |> V3d.Parse
+                    //                    | None -> getDirectionVec orientation view
                 }
         }
 
@@ -234,6 +242,7 @@ type ScaleBar with
             do! Json.write "view" camView
             do! Json.write "transformation" x.transformation  
             do! Json.write "preTransform" (x.preTransform.ToString())
+            //do! Json.write "direction" (x.direction.ToString())
         }
 
 
@@ -332,12 +341,13 @@ module InitScaleBarsParams =
         trafoChanged         = false
         usePivot             = false
         pivotSize            = Transformations.Initial.initPivotSize 0.4
+        eulerMode            = EulerMode.defaultMode
     }
 
     let thickness = {
         value   = 0.03
         min     = 0.001
-        max     = 1.0
+        max     = 10.0
         step    = 0.001
         format  = "{0:0.000}"
     }
@@ -367,7 +377,7 @@ module InitScaleBarsParams =
     }
 
     let initialScaleBarDrawing = {
-        orientation     = Orientation.Horizontal
+        orientation     = Orientation.Horizontal_cam
         alignment       = Pivot.Left
         thickness       = thickness
         length          = length

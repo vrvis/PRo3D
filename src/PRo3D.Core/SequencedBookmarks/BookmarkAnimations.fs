@@ -1,15 +1,17 @@
 ﻿namespace PRo3D.Core
 
+open System
 open Aardvark.Base
 open Aardvark.UI
 open Aardvark.UI.Primitives
+
 open FSharp.Data.Adaptive
 
 open Aardvark.Rendering
-open Aardvark.UI.Anewmation
-open Aardvark.UI.Anewmation.AnimationSplinePrimitives.Animation
-open Aardvark.UI.Anewmation.AnimationPrimitives.Animation
-open Aardvark.UI.Anewmation.AnimationCameraPrimitives.Animation
+open Aardvark.UI.Animation
+open Aardvark.UI.Animation.AnimationSplinePrimitives.Animation
+open Aardvark.UI.Animation.AnimationPrimitives.Animation
+open Aardvark.UI.Animation.AnimationCameraPrimitives.Animation
 
 open PRo3D.Base
 open PRo3D.Core.SequencedBookmarks
@@ -34,6 +36,7 @@ module BookmarkAnimations =
         let frustum_ = SceneStateViewConfig.frustumModel_ >-> FrustumModel.frustum_
         let focal_   = SceneStateViewConfig.frustumModel_ >-> FrustumModel.focal_ >-> NumericInput.value_
 
+        // interpolate ViewConfigModel for animation
         let interpVcm (src : SceneStateViewConfig) (dst : SceneStateViewConfig)
                 : IAnimation<'Model, SceneStateViewConfig> =
             //let animFocal = Primitives.lerp src.frustumModel.focal.value src.frustumModel.focal.value
@@ -51,6 +54,32 @@ module BookmarkAnimations =
                                 |> Optic.set frustum_ newFrustum 
                                 |> Optic.set focal_   focal
                                 )
+
+        let interpObservationInfo (src : Gis.ObservationInfo) (dst : Gis.ObservationInfo) =
+            match src.valuesIfComplete, dst.valuesIfComplete with
+            | Some (t1, o1, r1), Some (t2, o2, r2) -> 
+                let timeAnimation = 
+                    lerp src.time.date.Ticks dst.time.date.Ticks
+                    |> Animation.create
+                    |> Animation.seconds 1 // necessary?
+                    |> Animation.map (fun ticks ->
+                        let newCalendar =  {dst.time with date = new DateTime(ticks)}
+                        let info : Gis.ObservationInfo = 
+                            {
+                                target   = Some t2
+                                observer = Some o2
+                                referenceFrame = Some r2
+                                time     = newCalendar
+                            }                    
+                        info
+                    )
+
+                    
+                
+                timeAnimation
+            | _ -> 
+                Log.warn "[BookmarkAnimation] Incomplete observation info."
+                Animation.empty
 
 
         /// Creates an animation that interpolates between two bookmarks
@@ -79,14 +108,30 @@ module BookmarkAnimations =
                 match src.sceneState, dst.sceneState with
                 | Some srcState, Some dstState ->
                     let _view = SequencedBookmarkModel._cameraView
+                    let _obsInfo = SequencedBookmarkModel.observationInfo_ 
 
                     let animFocal =
                         (interpVcm srcState.stateConfig dstState.stateConfig) 
                         |> Animation.map (fun vcm -> 
                             Optic.set SequencedBookmarkModel._stateConfig vcm dst) 
-                    
-                    Animation.map2 (fun c f -> f |> Optic.set _view (Optic.get _view c)) 
-                                    animCam animFocal
+                    let anim = 
+                        Animation.map2 (fun c f -> f |> Optic.set _view (Optic.get _view c)) 
+                                       animCam animFocal
+                    let anim = 
+                        match src.observationInfo, dst.observationInfo with
+                        | Some info1, Some info2 ->
+                            let obsInfoAnim = 
+                                interpObservationInfo info1 info2
+                                |> Animation.map (fun info ->
+                                    Optic.set SequencedBookmarkModel.observationInfo_ (Some info) dst
+                                )
+
+                            Animation.map2 (fun obs other -> 
+                                other |> Optic.set _obsInfo (Optic.get _obsInfo obs) 
+                                ) obsInfoAnim anim
+                        | _ -> 
+                            anim
+                    anim
                 | _ -> 
                     animCam
                 
@@ -279,33 +324,33 @@ module BookmarkAnimations =
     //    let m = {m with originalSceneState = Some (Optic.get lenses.sceneState_ outerModel)}
     //    outerModel, m
 
-    let smoothPathAllBookmarks (m : SequencedBookmarks)
-                               (lenses : BookmarkLenses<'a>)
-                               (outerModel      : 'a) =
-        let bookmarks = orderedLoadedBookmarks m
-        let animation =
-            bookmarks
-            |> smoothBookmarkPath m.animationSettings.smoothingFactor.value
-            |> List.ofArray
-            |> List.map (Animation.onStart (fun name x m -> 
-                                                    Log.line "selected bm %s" x.name
-                                                    Optic.set lenses.selectedBookmark_ (Some x.key) m
-                                    ))
-                |> Animation.path
-        let animation = 
-            animation
-            |> addGlobalAttributes m lenses outerModel
+    /// This function does no work with focal length therefore it is not in use
+    //let smoothPathAllBookmarks (m : SequencedBookmarks)
+    //                           (lenses : BookmarkLenses<'a>)
+    //                           (outerModel      : 'a) =
+    //    let bookmarks = orderedLoadedBookmarks m
+    //    let animation =
+    //        bookmarks
+    //        |> smoothBookmarkPath m.animationSettings.smoothingFactor.value
+    //        |> List.ofArray
+    //        |> List.map (Animation.onStart (fun name x m -> 
+    //                                                Log.line "selected bm %s" x.name
+    //                                                Optic.set lenses.selectedBookmark_ (Some x.key) m
+    //                                ))
+    //            |> Animation.path
+    //    let animation = 
+    //        animation
+    //        |> addGlobalAttributes m lenses outerModel
                 
-        let outerModel =
-            outerModel 
-            |> Animator.createAndStart AnimationSlot.camera animation
-        //let m = {m with savedSceneState = Some (Optic.get lenses.sceneState_ outerModel)}
-        outerModel, m
+    //    let outerModel =
+    //        outerModel 
+    //        |> Animator.createAndStart AnimationSlot.camera animation
+    //    //let m = {m with savedSceneState = Some (Optic.get lenses.sceneState_ outerModel)}
+    //    outerModel, m
         
     let pathWithPausing (m : SequencedBookmarks)
                         (lenses : BookmarkLenses<'a>)
                         (outerModel      : 'a) =
-        let aspectRatio = m.resolutionX.value / m.resolutionY.value
         let bookmarks = orderedLoadedBookmarks m
         let animations =
             bookmarks
@@ -328,7 +373,7 @@ module BookmarkAnimations =
         let outerModel =
             outerModel 
             |> Animator.createAndStart AnimationSlot.camera animation
-        //let m = {m with savedSceneState = Some (Optic.get lenses.sceneState_ outerModel)}
+       // let m = {m with savedSceneState = Some (Optic.get lenses.sceneState_ outerModel)}
         outerModel, m
 
     let cameraOnly (m : SequencedBookmarks)

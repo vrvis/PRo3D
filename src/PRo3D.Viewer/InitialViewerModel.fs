@@ -14,10 +14,10 @@ open PRo3D.Core.SequencedBookmarks
 
 open PRo3D.Navigation2
 open Aardvark.UI
-open Aardvark.UI.Anewmation
+open Aardvark.UI.Animation
 open Aardvark.UI.Primitives
 open Aardvark.UI.Trafos
-open Aardvark.UI.Animation
+open Aardvark.UI.Animation.Deprecated
 open Aardvark.Rendering
 
 module Viewer =
@@ -102,6 +102,7 @@ module Viewer =
                     traverses             = TraverseModel.initial
                     sequencedBookmarks    = SequencedBookmarks.initial //with outputPath = Config.besideExecuteable}
                     screenshotModel       = ScreenshotModel.initial
+                    gisApp                = Gis.GisApp.initial startupArgs.defaultSpiceKernelPath
                 }
 
             viewerVersion   = viewerVerson
@@ -168,10 +169,9 @@ module Viewer =
             renderingUrl        = renderingUrl       
             numberOfSamples     = numberOfSamples    
             screenshotDirectory = screenshotDirectory
-            animator            = Anewmation.Animator.initial animatorLens
+            animator            = Animation.Animator.initial animatorLens
 
             provenanceModel = ProvenanceModel.invalid
-
         } |> ProvenanceApp.emptyWithModel
 
 

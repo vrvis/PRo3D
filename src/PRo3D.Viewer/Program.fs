@@ -11,11 +11,7 @@ open System.Collections.Generic
 
 open Aardvark.Base
 open Aardvark.Application.Slim
-open Aardvark.SceneGraph.Opc
 open Aardvark.UI
-open Aardvark.VRVis
-open Aardvark.VRVis.Opc
-open Aardvark.GeoSpatial.Opc
 open OpcViewer.Base
 open Aardvark.Rendering
 
@@ -45,6 +41,7 @@ open FSharp.Data.Adaptive
 open System.Reflection
 open System.Runtime.InteropServices
 
+open Aardvark.GeoSpatial.Opc.Load
 
 type EmbeddedRessource = EmbeddedRessource
 
@@ -55,7 +52,7 @@ type Result =
       result : string;
    }
 
-let viewerVersion       = "4.20.0-prerelease1"
+let viewerVersion       = "4.26.0-prerelease1"
 let catchDomainErrors   = false
 
 open System.IO
@@ -127,10 +124,7 @@ let main argv =
 
     System.Threading.ThreadPool.SetMinThreads(12, 12) |> ignore
     
-
     Log.line "path: %s, current dir: %s" executeablePath System.Environment.CurrentDirectory
-    Config.colorPaletteStore <- Path.combine [appData; "favoriteColors.js"]
-    Log.line "Color palette favorite colors are stored here: %s" Config.colorPaletteStore
 
     let os = 
         if RuntimeInformation.IsOSPlatform(OSPlatform.OSX) then
@@ -166,7 +160,7 @@ let main argv =
         match aardiumPath with
         | Some p when true -> 
             Log.line "init aardium at: %s" p
-            Aardium.initPath p
+            Aardium.initAt p
         | _ -> 
             Log.warn "system aardium"; 
             Aardium.init()
@@ -176,7 +170,7 @@ let main argv =
     let mutable cooTrafoInitialized = false
     let disposables = List<IDisposable>()
     try
-        CooTransformation.initCooTrafo appData
+        CooTransformation.initCooTrafo startupArgs.defaultSpiceKernelPath appData
         cooTrafoInitialized <- true
 
         //use app = new VulkanApplication()
@@ -380,6 +374,7 @@ let main argv =
                 path "/websocket" >=> handShake ws
                 prefix "/api" >=> remoteApi
                 Reflection.assemblyWebPart typeof<EmbeddedRessource>.Assembly
+                Aardvark.UI.Primitives.Resources.WebPart
                // Reflection.assemblyWebPart typeof<CorrelationDrawing.CorrelationPanelResources>.Assembly //(System.Reflection.Assembly.LoadFrom "PRo3D.CorrelationPanels.dll")
                // prefix "/instrument" >=> MutableApp.toWebPart runtime instrumentApp
 
@@ -412,9 +407,6 @@ let main argv =
             ] 
 
         disposables.Add(suaveServer)
-
-        Log.line "serving at: %s" renderingUrl
-        Log.line "url: %s" renderingUrl
 
         
         //WebPart.startServer 4322 [
@@ -455,7 +447,7 @@ let main argv =
                 remoteApp.update Guid.Empty act
                 { result = shot.folder }
 
-            let remotePort = 12346
+            let remotePort = 12346 
             let d = WebPart.startServerLocalhost 12346 [ 
                 MutableApp.toWebPart runtime (remoteApp)
                 POST >=> path "/shots" >=> mapJson takeScreenshot
@@ -467,11 +459,9 @@ let main argv =
         else   
             Log.warn "no remote app started"
     
-
+        System.Threading.Thread.Sleep(1000)
         // do not change this line. full url with url needs to be printed for mac deployment!
         Log.line "full url: %s" renderingUrl
-
-        System.Threading.Thread.Sleep(100)
 
         if startupArgs.serverMode then  
             Log.line "running server mode. Press Key to close >"
@@ -483,11 +473,6 @@ let main argv =
                 height 800
                 debug true
                 title titlestr
-                
-
-                windowoptions {|  minWidth = 180; minHeight = 180; title = titlestr;|}
-                hideDock true
-                autoclose true
             }
 
     finally

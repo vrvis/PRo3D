@@ -3,17 +3,16 @@ namespace PRo3D.Core.Surface
 open System
 open System.IO
 open System.Diagnostics
-open FSharp.Data.Adaptive
 
 open Aardvark.Base
 open Aardvark.UI
 open Aardvark.UI.Primitives
 open Aardvark.Rendering
 open Aardvark.SceneGraph
-open Aardvark.SceneGraph.IO
-open Aardvark.SceneGraph.Opc
+open Aardvark.SceneGraph.Assimp
+open Aardvark.Data.Opc
 
-open Aardvark.VRVis.Opc
+open Aardvark.Data.Opc
 open Aardvark.UI.Operators
 open Aardvark.UI.Trafos  
 
@@ -27,6 +26,7 @@ open PRo3D.Core.Surface
 
 open Adaptify.FSharp.Core
 open Aardvark.Base.Coder
+open FSharp.Data.Adaptive
 
 type SurfaceAppAction =
 | SurfacePropertiesMessage  of SurfaceProperties.Action
@@ -97,6 +97,9 @@ module SurfaceUtils =
 
             
             contourModel = ContourLineModel.initial
+
+            highlightSelected = true
+            highlightAlways   = false
         }       
    
 
@@ -117,9 +120,7 @@ module SurfaceUtils =
             stream.CopyTo(fileStream)
             fileStream.Close ()
 
-
         module AssimpLoader =
-
 
             let loadObject (surface : Surface) : SgSurface =
                 Log.line "[OBJ] Please wait while the file is being loaded..." 
@@ -202,6 +203,7 @@ module SurfaceUtils =
                     picking     = Picking.KdTree(kdTrees |> HashMap.ofList) //Picking.PickMesh meshes
                     isObj       = true
                     opcScene    = None
+                    dataSource  = DataSource.Mesh
                     //transformation = Init.Transformations
                 }
                  
@@ -650,6 +652,7 @@ module SurfaceUtils =
                     picking         = Picking.KdTree(kdTrees |> HashMap.ofList)
                     isObj           = true
                     opcScene        = None
+                    dataSource      = DataSource.Mesh
                     //transformation = Init.Transformations
                 }
                  
@@ -672,9 +675,6 @@ module SurfaceUtils =
                       |> HashMap.ofList       
 
                 sgObjects
-
-        
-
 
     module SurfaceAttributes = 
         open System.Xml
@@ -824,8 +824,6 @@ module SurfaceApp =
               
         { model with surfaces = { model.surfaces with flat = flat' } }
 
-
-
     let update 
         (model     : SurfaceModel) 
         (action    : SurfaceAppAction) 
@@ -881,7 +879,7 @@ module SurfaceApp =
                     Log.startTimed "[RebuildKdTrees] creating kdtrees"
                     let cnt = 
                         hs |> Array.sumBy (fun h -> 
-                            let m = KdTrees.loadKdTrees' h Trafo3d.Identity true ViewerModality.XYZ Serialization.binarySerializer true true PRo3D.Core.Surface.DebugKdTreesX.loadTriangles' false Aardvark.VRVis.Opc.KdTrees.KdTreeParameters.legacyDefault   
+                            let m = KdTrees.loadKdTrees' h Trafo3d.Identity true ViewerModality.XYZ Serialization.binarySerializer true true PRo3D.Core.Surface.DebugKdTreesX.loadTriangles' false false KdTrees.KdTreeParameters.legacyDefault   
                             HashMap.count m
                         )
                     Log.stop()
@@ -1164,7 +1162,7 @@ module SurfaceApp =
                 //let! selected = s |> isSingleSelect model
             
                 let! c = mkColor model s
-                let infoc = sprintf "color: %s" (Html.ofC4b C4b.White)
+                let infoc = sprintf "color: %s" (Html.color C4b.White)
             
                 let! key = s.guid                                                                             
                 let! absRelIcons = absRelIcons s
@@ -1184,11 +1182,11 @@ module SurfaceApp =
                     (isSingleSelect model s) 
                     |> AVal.map(fun x -> 
                         (if x then C4b.VRVisGreen else C4b.Gray) 
-                        |> Html.ofC4b 
+                        |> Html.color 
                         |> sprintf "color: %s"
                     ) 
             
-               // let headerColor = sprintf "color: %s" (Html.ofC4b C4b.Gray)
+               // let headerColor = sprintf "color: %s" (Html.color C4b.Gray)
                 let headerAttributes =
                     amap {
                         yield onClick singleSelect
@@ -1222,7 +1220,7 @@ module SurfaceApp =
 
                 //[clientEvent "onclick" (sprintf "aardvark.electron.shell.showItemInFolder('%s');" (Helpers.escape path)) ] <---- this is the way to go for "reveal in explorer/finder"
             
-                let bgc = sprintf "color: %s" (Html.ofC4b c)
+                let bgc = sprintf "color: %s" (Html.color c)
                 yield div [clazz "item"; style infoc] [
                     i [clazz "cube middle aligned icon"; onClick multiSelect;style bgc] [] 
                     div [clazz "content"; style infoc] [                     
@@ -1246,7 +1244,10 @@ module SurfaceApp =
                                 yield GuiEx.iconCheckBox s.isActive (ToggleActiveFlag key) 
                                 |> UI.wrapToolTip DataPosition.Bottom "Toggle IsActive"
 
-                                yield i [clazz "exclamation circle icon"; onClick (fun _ -> RebuildKdTrees key)] [] 
+                                yield 
+                                    i [ clazz "wrench icon"; onEvent "generate" [] (fun _ -> RebuildKdTrees key)
+                                        // kdTreeRebuildOptions is in utilities.js
+                                        clientEvent "onclick" "top.aardvark.dialog.showMessageBox(null, kdTreeRebuildOptions).then((r) => { console.warn(r.response); if(r.response == 1) { aardvark.processEvent('__ID__', 'generate');} else { console.warn('user cancelled kdtree construction.'); } });" ] [] 
                                     |> UI.wrapToolTip DataPosition.Bottom "rebuild kdTree"           
             
                                 let! path = s.importPath
@@ -1275,7 +1276,7 @@ module SurfaceApp =
         alist {
 
             let! s = model.activeGroup
-            let color = sprintf "color: %s" (Html.ofC4b C4b.White)                
+            let color = sprintf "color: %s" (Html.color C4b.White)                
             let children = AList.collecti (fun i v -> viewTree scenePath (i::path) v model) group.subNodes    
             let activeAttributes = GroupsApp.setActiveGroupAttributeMap path model group GroupsMessage
                                    
@@ -1347,14 +1348,12 @@ module SurfaceApp =
                 
         }
 
-
     let viewSurfacesGroups (scenePath : aval<Option<string>>) (model:AdaptiveSurfaceModel) = 
         require GuiEx.semui (
             Incremental.div 
               (AttributeMap.ofList [clazz "ui celled list"]) 
               (viewTree scenePath [] model.surfaces.rootGroup model.surfaces)            
         )    
-        
 
     //let viewSurfaceProperties (model:AdaptiveSurfaceModel) =
     //    adaptive {

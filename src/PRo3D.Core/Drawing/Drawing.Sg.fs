@@ -6,16 +6,18 @@ open Aardvark.Base
 open Aardvark.Application
 open Aardvark.UI
 
+open Aardvark.UI.Primitives
 open FSharp.Data.Adaptive
 open FSharp.Data.Adaptive.Operators
 open Aardvark.Rendering
 open Aardvark.Application
 open Aardvark.SceneGraph
-open Aardvark.SceneGraph.Opc
+open Aardvark.Data.Opc
 open Aardvark.Rendering.Text
 
 open Aardvark.UI
-open Aardvark.UI.Primitives    
+
+open Aardvark.UI    
 
 open OpcViewer.Base
 
@@ -222,7 +224,7 @@ module Sg =
                         let reallyHit = 
                              // TODO hs/to real horrorshow here!
                              lines 
-                             |> Array.forany (fun e -> 
+                             |> Array.exists (fun e -> 
                                  let m = modelTrafo * sceneHit.event.evtView *  sceneHit.event.evtProj
                                  let r = sceneHit.localRay.Ray.Ray
                                  let a = Line3d(r.Origin, r.Origin + r.Direction * 10000.0)
@@ -300,9 +302,13 @@ module Sg =
                 |> computeCenterOfMass
             )
 
-        Sg.text view conf.nearPlane conf.hfov pos (pos |> AVal.map Trafo3d.Translation) anno.textsize.value text
+        Sg.text view conf.nearPlane conf.hfov pos (pos |> AVal.map Trafo3d.Translation) anno.textsize.value text (AVal.constant C4b.White)
     
-    let drawText (view : aval<CameraView>) (conf: innerViewConfig) (anno : AdaptiveAnnotation) = 
+    let drawText 
+        (view : aval<CameraView>) 
+        (conf: innerViewConfig) 
+        (anno : AdaptiveAnnotation) = 
+
         drawText' view conf anno.text anno
     
     let optionalSet (sg : ISg<_>) (m : aval<bool>) : aset<ISg<_>> =
@@ -566,7 +572,7 @@ module Sg =
         |> IndexedGeometryPrimitives.lines
         |> Sg.ofIndexedGeometry
         |> Sg.uniform "LineWidth" (AVal.constant width)
-        |> Sg.uniform "DepthOffset" (AVal.constant 0.0001)
+        |> Sg.uniform "DepthOffset" (AVal.constant 0.0000000001)
         |> Sg.blendMode (AVal.constant BlendMode.None)
         |> Sg.effect [
             toEffect Aardvark.UI.Trafos.Shader.stableTrafo
