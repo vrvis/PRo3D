@@ -43,10 +43,12 @@ open Suave.Json
 
 open FSharp.Data.Adaptive
 
+open Aardvark.GeoSpatial.Opc.Load
+
 
 type EmbeddedRessource = EmbeddedRessource
 
-let viewerVersion       = "4.12.0-Snapshots"
+let viewerVersion       = "4.25.0-prerelease7-Snapshots"
 let catchDomainErrors   = false
 
 open System.IO
@@ -82,9 +84,6 @@ let startApplication (startupArgs : CLStartupArgs) =
     Aardvark.Base.Report.LogFileName <- logFilePath
     Log.line "Running with AppData: %s" appData
 
-    Config.colorPaletteStore <- Path.combine [appData; "favoriteColors.js"]
-    Log.line "Color palette favorite colors are stored here: %s" Config.colorPaletteStore
-
     let crashDumpFile = "Aardvark.log"
 
     Aardium.init()      
@@ -96,7 +95,7 @@ let startApplication (startupArgs : CLStartupArgs) =
 
 
     try 
-        CooTransformation.initCooTrafo appData
+        CooTransformation.initCooTrafo None appData
         cooTrafoInitialized <- true
 
         use app = new OpenGlApplication()
@@ -196,6 +195,7 @@ let startApplication (startupArgs : CLStartupArgs) =
                 MutableApp.toWebPart' runtime false mainApp
                 path "/websocket" >=> handShake ws
                 Reflection.assemblyWebPart typeof<EmbeddedRessource>.Assembly
+                Aardvark.UI.Primitives.Resources.WebPart
                 // Reflection.assemblyWebPart typeof<CorrelationDrawing.CorrelationPanelResources>.Assembly //(System.Reflection.Assembly.LoadFrom "PRo3D.CorrelationPanels.dll")
                 // prefix "/instrument" >=> MutableApp.toWebPart runtime instrumentApp
 

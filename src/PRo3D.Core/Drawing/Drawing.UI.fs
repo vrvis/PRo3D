@@ -9,7 +9,6 @@ open Aardvark.Application
 open Aardvark.UI
 open Aardvark.UI.Primitives    
 
-open PRo3D
 open PRo3D.Base
 open PRo3D.Base.Annotation
 open PRo3D.Core
@@ -22,7 +21,7 @@ module UI =
             Html.Layout.boxH [ i [clazz "large Write icon"] [] ]
             Html.Layout.boxH [ Html.SemUi.dropDown model.geometry SetGeometry ]
             Html.Layout.boxH [ Html.SemUi.dropDown model.projection SetProjection ]
-            Html.Layout.boxH [ ColorPicker.viewAdvanced ColorPicker.defaultPalette paletteFile "pro3d" model.color |> UI.map ChangeColor; div [] [] ]
+            Html.Layout.boxH [ ColorPicker.viewAdvanced ColorPicker.defaultPalette paletteFile "pro3d" false model.color |> UI.map ChangeColor; div [] [] ]
             Html.Layout.boxH [ Numeric.view' [InputBox] model.thickness |> UI.map ChangeThickness ]
             Html.Layout.boxH [ i [clazz "large crosshairs icon"] [] ]
             Html.Layout.boxH [ Numeric.view' [InputBox] model.samplingAmount |> UI.map ChangeSamplingAmount ]
@@ -74,7 +73,7 @@ module UI =
             let singleSelect = fun _ -> singleSelect(a,path)
             let multiSelect  = fun _ -> multiSelect(a,path)
             
-            let ac = sprintf "color: %s" (Html.ofC4b C4b.White)
+            let ac = sprintf "color: %s" (Html.color C4b.White)
             
             let visibleIcon = 
                 amap {
@@ -93,7 +92,7 @@ module UI =
 
                     let! guh = model.selectedLeaves.Content
                     let! c = mkColor model a
-                    let s = style (sprintf "color: %s" (Html.ofC4b c))
+                    let s = style (sprintf "color: %s" (Html.color c))
                     yield s
                 } |> AttributeMap.ofAMap
             
@@ -104,7 +103,7 @@ module UI =
                         C4b.VRVisGreen
                     else
                         C4b.Gray
-                    |> Html.ofC4b 
+                    |> Html.color 
                     |> sprintf "color: %s"
                 ) 
 
@@ -168,7 +167,7 @@ module UI =
                                                   
         let setActiveAttributes = GroupsApp.setActiveGroupAttributeMap path model group GroupsMessage
                        
-        let color = sprintf "color: %s" (Html.ofC4b C4b.White)
+        let color = sprintf "color: %s" (Html.color C4b.White)
         let desc =
             div [style color] [       
                 Incremental.text group.name

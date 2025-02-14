@@ -5,6 +5,7 @@ open Aardvark.Base
 open FSharp.Data.Adaptive
 open Aardvark.Rendering
 open Aardvark.UI
+open Aardvark.UI.Primitives
 
 open PRo3D
 open Chiron
@@ -141,7 +142,17 @@ type Ext with
         json {
             do! Json.write "trafo"  (v.ToString())
         }
-    
+
+    //Trafo3d option
+    static member FromJson1 (ext : Ext, _ : Option<Trafo3d>) = 
+        json {
+            let! t  = Json.read "trafo"
+            match t with 
+            | Some trafo -> return (Some(trafo |> Trafo3d.Parse))
+            | None -> return None
+                      
+        }
+
     //VectorInput
     static member FromJson1 (ext : Ext, _ : V3dInput) = 
         json {
